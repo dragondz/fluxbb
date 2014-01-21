@@ -33,7 +33,7 @@ $is_subscribed = $tid && $cur_posting['is_subscribed'];
 
 // Is someone trying to post into a redirect forum?
 if ($cur_posting['redirect_url'] != '')
-	message($lang_common['Bad request']);
+	message($lang_common['Bad request'], false, '404 Not Found');
 
 // Sort out who the moderators are and if we are currently a moderator (or an admin)
 $mods_array = ($cur_posting['moderators'] != '') ? unserialize($cur_posting['moderators']) : array();
@@ -63,6 +63,9 @@ if (isset($_POST['form_sent']))
 	if (!isset($_POST['preview']) && $pun_user['last_post'] != '' && (time() - $pun_user['last_post']) < $pun_user['g_post_flood'])
 		$errors[] = sprintf($lang_post['Flood start'], $pun_user['g_post_flood'], $pun_user['g_post_flood'] - (time() - $pun_user['last_post']));
 
+	// Make sure they got here from the site
+	confirm_referrer(array('post.php', 'viewtopic.php'));
+	
 	// If it's a new topic
 	if ($fid)
 	{
@@ -171,7 +174,7 @@ if (isset($_POST['form_sent']))
 				$new_tid = $tid;
 
 				// Insert the new post
-				$db->query('INSERT INTO '.$db->prefix.'posts (poster, poster_id, poster_ip, message, hide_smilies, posted, topic_id) VALUES(\''.$db->escape($username).'\', '.$pun_user['id'].', \''.get_remote_address().'\', \''.$db->escape($message).'\', '.$hide_smilies.', '.$now.', '.$tid.')') or error('Unable to create post', __FILE__, __LINE__, $db->error());
+				$db->query('INSERT INTO '.$db->prefix.'posts (poster, poster_id, poster_ip, message, hide_smilies, posted, topic_id) VALUES(\''.$db->escape($username).'\', '.$pun_user['id'].', \''.$db->escape(get_remote_address()).'\', \''.$db->escape($message).'\', '.$hide_smilies.', '.$now.', '.$tid.')') or error('Unable to create post', __FILE__, __LINE__, $db->error());
 				$new_pid = $db->insert_id();
 
 				// To subscribe or not to subscribe, that ...
@@ -187,7 +190,7 @@ if (isset($_POST['form_sent']))
 			{
 				// It's a guest. Insert the new post
 				$email_sql = ($pun_config['p_force_guest_email'] == '1' || $email != '') ? '\''.$db->escape($email).'\'' : 'NULL';
-				$db->query('INSERT INTO '.$db->prefix.'posts (poster, poster_ip, poster_email, message, hide_smilies, posted, topic_id) VALUES(\''.$db->escape($username).'\', \''.get_remote_address().'\', '.$email_sql.', \''.$db->escape($message).'\', '.$hide_smilies.', '.$now.', '.$tid.')') or error('Unable to create post', __FILE__, __LINE__, $db->error());
+				$db->query('INSERT INTO '.$db->prefix.'posts (poster, poster_ip, poster_email, message, hide_smilies, posted, topic_id) VALUES(\''.$db->escape($username).'\', \''.$db->escape(get_remote_address()).'\', '.$email_sql.', \''.$db->escape($message).'\', '.$hide_smilies.', '.$now.', '.$tid.')') or error('Unable to create post', __FILE__, __LINE__, $db->error());
 				$new_pid = $db->insert_id();
 			}
 
@@ -293,13 +296,13 @@ if (isset($_POST['form_sent']))
 					$db->query('INSERT INTO '.$db->prefix.'topic_subscriptions (user_id, topic_id) VALUES('.$pun_user['id'].' ,'.$new_tid.')') or error('Unable to add subscription', __FILE__, __LINE__, $db->error());
 
 				// Create the post ("topic post")
-				$db->query('INSERT INTO '.$db->prefix.'posts (poster, poster_id, poster_ip, message, hide_smilies, posted, topic_id) VALUES(\''.$db->escape($username).'\', '.$pun_user['id'].', \''.get_remote_address().'\', \''.$db->escape($message).'\', '.$hide_smilies.', '.$now.', '.$new_tid.')') or error('Unable to create post', __FILE__, __LINE__, $db->error());
+				$db->query('INSERT INTO '.$db->prefix.'posts (poster, poster_id, poster_ip, message, hide_smilies, posted, topic_id) VALUES(\''.$db->escape($username).'\', '.$pun_user['id'].', \''.$db->escape(get_remote_address()).'\', \''.$db->escape($message).'\', '.$hide_smilies.', '.$now.', '.$new_tid.')') or error('Unable to create post', __FILE__, __LINE__, $db->error());
 			}
 			else
 			{
 				// Create the post ("topic post")
 				$email_sql = ($pun_config['p_force_guest_email'] == '1' || $email != '') ? '\''.$db->escape($email).'\'' : 'NULL';
-				$db->query('INSERT INTO '.$db->prefix.'posts (poster, poster_ip, poster_email, message, hide_smilies, posted, topic_id) VALUES(\''.$db->escape($username).'\', \''.get_remote_address().'\', '.$email_sql.', \''.$db->escape($message).'\', '.$hide_smilies.', '.$now.', '.$new_tid.')') or error('Unable to create post', __FILE__, __LINE__, $db->error());
+				$db->query('INSERT INTO '.$db->prefix.'posts (poster, poster_ip, poster_email, message, hide_smilies, posted, topic_id) VALUES(\''.$db->escape($username).'\', \''.$db->escape(get_remote_address()).'\', '.$email_sql.', \''.$db->escape($message).'\', '.$hide_smilies.', '.$now.', '.$new_tid.')') or error('Unable to create post', __FILE__, __LINE__, $db->error());
 			}
 			$new_pid = $db->insert_id();
 
@@ -523,7 +526,7 @@ else if ($fid)
 	$form = '<form id="post" method="post" action="post.php?action=post&amp;fid='.$fid.'" onsubmit="return process_form(this)">';
 }
 else
-	message($lang_common['Bad request']);
+	message($lang_common['Bad request'], false, '404 Not Found');
 
 
 $page_title = array(pun_htmlspecialchars($pun_config['o_board_title']), $action);
@@ -547,6 +550,8 @@ require PUN_ROOT.'header.php';
 		<ul class="crumbs">
 			<li><a href="index.php"><?php echo $lang_common['Index'] ?></a></li>
 			<li><span>»&#160;</span><a href="viewforum.php?id=<?php echo $cur_posting['id'] ?>"><?php echo pun_htmlspecialchars($cur_posting['forum_name']) ?></a></li>
+<?php if (isset($_POST['req_subject'])): ?>			<li><span>»&#160;</span><?php echo pun_htmlspecialchars($_POST['req_subject']) ?></li>
+<?php endif; ?>
 <?php if (isset($cur_posting['subject'])): ?>			<li><span>»&#160;</span><a href="viewtopic.php?id=<?php echo $tid ?>"><?php echo pun_htmlspecialchars($cur_posting['subject']) ?></a></li>
 <?php endif; ?>			<li><span>»&#160;</span><strong><?php echo $action ?></strong></li>
 		</ul>
